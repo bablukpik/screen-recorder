@@ -104,7 +104,7 @@ pause.addEventListener('click', () => {
     } else {
         console.error(`recorder in unhandled state: ${recorder.state}`);
     }
-        
+
     console.log(`recorder ${recorder.state === 'paused' ? "paused" : "recording"}`);
 });
 
@@ -145,4 +145,27 @@ save.addEventListener('click', () => {
         window.URL.revokeObjectURL(url);
         console.log(`${a.download} save option shown`);
     }, 100);
+});
+
+// Upload to server
+player.on('finishRecord', function () {
+    console.log(player.recordedData);
+
+    let formData = new FormData();
+    formData.append('video', player.recordedData.video);
+
+    xhr('./upload-video.php', formData, function (fName) {
+        console.log("Video succesfully uploaded !");
+    });
+
+    function xhr(url, data, callback) {
+        var request = new XMLHttpRequest();
+        request.onreadystatechange = function () {
+            if (request.readyState == 4 && request.status == 200) {
+                callback(location.href + request.responseText);
+            }
+        };
+        request.open('POST', url);
+        request.send(data);
+    }
 });
