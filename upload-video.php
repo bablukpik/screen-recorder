@@ -1,4 +1,5 @@
 <?php
+echo "hi";
 if (isset($_FILES["video"])) {
     $fileName = "myvideo.webm";
     $uploadDirectory = './' . $fileName;
