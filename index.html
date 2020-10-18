@@ -1,16 +1,27 @@
 <!DOCTYPE html>
 <html lang="en">
-<div>
-    <video controls playsinline autoplay hidden id="recordPlayback"></video>
-</div>
-<div id="recordControls">
-    <span id="recordStatus"></span>
-    <button class="recordBtn" id="recordStart">Record</button>
-    <button class="recordBtn" id="recordPause" disabled>Pause</button>
-    <button class="recordBtn" id="recordStop" disabled>Stop</button>
-    <button class="recordBtn" id="recordPlay" disabled>Play</button>
-    <button class="recordBtn" id="recordSave" disabled>Save</button>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Screen Recorder</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div>
+        <video controls playsinline autoplay hidden id="recordPlayback"></video>
+        <audio></audio>
+    </div>
+    <div id="recordControls">
+        <span id="recordStatus"></span>
+        <button class="recordBtn" id="recordStart">Record</button>
+        <button class="recordBtn" id="recordPause" disabled>Pause</button>
+        <button class="recordBtn" id="recordStop" disabled>Stop</button>
+        <button class="recordBtn" id="recordPlay" disabled>Play</button>
+        <button class="recordBtn" id="recordSave" disabled>Save</button>
+    </div>
     <script src="recorder.js"></script>
-</div>
+</body>
 
 </html>

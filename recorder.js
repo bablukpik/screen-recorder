@@ -1,6 +1,21 @@
-let recorder;
-let recordingData = [];
-let recorderStream;
+const start = document.getElementById('recordStart');
+const pause = document.getElementById('recordPause');
+const stop = document.getElementById('recordStop');
+const play = document.getElementById('recordPlay');
+const playback = document.getElementById('recordPlayback');
+const save = document.getElementById('recordSave');
+
+let userMediaStream, displayMediaStream, stream, recorder, recordedChunks = [],
+    blobData;
+const userMediaConstraints = { video: false, audio: true };
+const displayMediaConstraints = {
+    video: {
+        cursor: 'always' | 'motion' | 'never',
+        displaySurface: 'application' | 'browser' | 'monitor' | 'window'
+    },
+    audio: false
+};
+const postToServerUrl = `./upload-video.php`;
 
 // Mixes multiple tracks
 function mixer(stream1, stream2) {
@@ -17,7 +32,6 @@ function mixer(stream1, stream2) {
     tracks = tracks.concat(stream1.getVideoTracks()).concat(stream2.getVideoTracks());
 
     return new MediaStream(tracks)
-
 }
 
 // Returns a filename based on timestamp
@@ -28,42 +42,43 @@ function getFilename() {
 }
 
 // Start recording
-const start = document.getElementById('recordStart');
-start.addEventListener('click', async () => {
-    let gumStream, gdmStream;
-    recordingData = [];
+start.addEventListener('click', async function() {
+    recordedChunks = [];
 
     try {
-        gumStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
-        gdmStream = await navigator.mediaDevices.getDisplayMedia({ video: { displaySurface: "browser" }, audio: true });
-
+        userMediaStream = await navigator.mediaDevices.getUserMedia(userMediaConstraints); // Audio-Video Stream
+        displayMediaStream = await navigator.mediaDevices.getDisplayMedia(displayMediaConstraints); // Screen Stream
     } catch (e) {
         console.error("capture failure", e);
-        return
+        return;
     }
 
-    recorderStream = gumStream ? mixer(gumStream, gdmStream) : gdmStream;
-    recorder = new MediaRecorder(recorderStream, { mimeType: 'video/webm' });
+    stream = userMediaStream ? mixer(userMediaStream, displayMediaStream) : displayMediaStream;
+    recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+    recorder.start();
 
+    // Stop sharing
+    stream.getVideoTracks()[0].onended = function() {
+        console.log('Clicked on Stop Sharing');
+        stopCapture();
+    };
+
+    // Chunks collection
     recorder.ondataavailable = e => {
         if (e.data && e.data.size > 0) {
-            recordingData.push(e.data);
+            recordedChunks.push(e.data);
         }
     };
 
-    recorder.onStop = () => {
-        recorderStream.getTracks().forEach(track => track.stop());
-        gumStream.getTracks().forEach(track => track.stop());
-        gdmStream.getTracks().forEach(track => track.stop());
+    // Onstop
+    recorder.onstop = function(e) {
+        console.log("data available after MediaRecorder.stop() called.");
 
-    };
+        blobData = new Blob(recordedChunks, { type: 'video/webm' });
+        postToServer(postToServerUrl, blobData)
+        console.log("recorder stopped");
+    }
 
-    recorderStream.addEventListener('inactive', () => {
-        console.log('Capture stream inactive');
-        stopCapture();
-    });
-
-    recorder.start();
     console.log("started recording");
     start.innerText = "Recording";
 
@@ -75,10 +90,13 @@ start.addEventListener('click', async () => {
 });
 
 // Stop recording
-const stop = document.getElementById('recordStop');
 function stopCapture() {
     console.log("Stopping recording");
     recorder.stop();
+
+    stream.getTracks().forEach(track => track.stop());
+    userMediaStream.getTracks().forEach(track => track.stop());
+    displayMediaStream.getTracks().forEach(track => track.stop());
 
     start.disabled = false;
     pause.disabled = true;
@@ -92,7 +110,6 @@ function stopCapture() {
 stop.addEventListener('click', stopCapture);
 
 // Pause recording
-const pause = document.getElementById('recordPause');
 pause.addEventListener('click', () => {
     if (recorder.state === 'paused') {
         recorder.resume();
@@ -110,11 +127,10 @@ pause.addEventListener('click', () => {
 
 // Play the recording in a popup window
 let isPlaying = false;
-const play = document.getElementById('recordPlay');
 play.addEventListener('click', () => {
     playback.hidden = !playback.hidden;
     if (!isPlaying && !playback.hidden) {
-        playback.src = window.URL.createObjectURL(new Blob(recordingData, { type: 'video/webm' }));
+        playback.src = window.URL.createObjectURL(new Blob(recordedChunks, { type: 'video/webm' }));
         playback.play();
         play.innerText = "Hide";
     } else {
@@ -123,17 +139,15 @@ play.addEventListener('click', () => {
 });
 
 // Media playback handlers
-const playback = document.getElementById('recordPlayback');
 playback.addEventListener('play', () => { isPlaying = true });
 playback.addEventListener('pause', () => { isPlaying = false });
 playback.addEventListener('playing', () => { isPlaying = true });
 playback.addEventListener('ended', () => { isPlaying = false });
 
 // Save the recording
-const save = document.getElementById('recordSave');
 save.addEventListener('click', () => {
-    const blob = new Blob(recordingData, { type: 'video/webm' });
-    const url = window.URL.createObjectURL(blob);
+    blobData = new Blob(recordedChunks, { type: 'video/webm' });
+    const url = window.URL.createObjectURL(blobData);
     const a = document.createElement('a');
     a.style.display = 'none';
     a.href = url;
@@ -148,24 +162,19 @@ save.addEventListener('click', () => {
 });
 
 // Upload to server
-player.on('finishRecord', function () {
-    console.log(player.recordedData);
+const postToServer = function(url, recordedBlob) {
+    console.log(recordedBlob);
 
     let formData = new FormData();
-    formData.append('video', player.recordedData.video);
+    formData.append('video', recordedBlob);
 
-    xhr('./upload-video.php', formData, function (fName) {
-        console.log("Video succesfully uploaded !");
-    });
-
-    function xhr(url, data, callback) {
-        var request = new XMLHttpRequest();
-        request.onreadystatechange = function () {
-            if (request.readyState == 4 && request.status == 200) {
-                callback(location.href + request.responseText);
-            }
-        };
-        request.open('POST', url);
-        request.send(data);
-    }
-});
+    var request = new XMLHttpRequest();
+    request.onreadystatechange = function() {
+        if (request.readyState == 4 && request.status == 200) {
+            console.log(request.responseText);
+        }
+    };
+    request.open('POST', url, true);
+    // request.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+    request.send(formData);
+}
