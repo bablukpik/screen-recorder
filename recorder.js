@@ -5,7 +5,7 @@ const play = document.getElementById('recordPlay');
 const playback = document.getElementById('recordPlayback');
 const save = document.getElementById('recordSave');
 
-let userMediaStream, displayMediaStream, stream, recorder, recordedChunks = [],
+let userMediaStream, displayMediaStream, stream, recorder, streamChunks = [],
     blobData;
 const userMediaConstraints = { video: false, audio: true };
 const displayMediaConstraints = {
@@ -43,17 +43,23 @@ function getFilename() {
 
 // Start recording
 start.addEventListener('click', async function() {
-    recordedChunks = [];
+    streamChunks = [];
 
     try {
-        userMediaStream = await navigator.mediaDevices.getUserMedia(userMediaConstraints); // Audio-Video Stream
-        displayMediaStream = await navigator.mediaDevices.getDisplayMedia(displayMediaConstraints); // Screen Stream
+        if (navigator.mediaDevices["getDisplayMedia"] && navigator.mediaDevices["getUserMedia"]) {
+            displayMediaStream = await navigator.mediaDevices.getDisplayMedia(displayMediaConstraints); // Screen Stream
+            userMediaStream = await navigator.mediaDevices.getUserMedia(userMediaConstraints); // Audio-Video Stream
+        } else if (navigator.mediaDevices["getUserMedia"]) {
+            userMediaStream = await navigator.mediaDevices.getUserMedia(userMediaConstraints); // Audio-Video Stream
+        } else {
+            displayMediaStream = await navigator.mediaDevices.getDisplayMedia(displayMediaConstraints); // Screen Stream
+        }
     } catch (e) {
         console.error("capture failure", e);
         return;
     }
 
-    stream = userMediaStream ? mixer(userMediaStream, displayMediaStream) : displayMediaStream;
+    stream = (displayMediaStream && userMediaStream && mixer(userMediaStream, displayMediaStream)) || displayMediaStream || userMediaStream;
     recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
     recorder.start();
 
@@ -66,7 +72,7 @@ start.addEventListener('click', async function() {
     // Chunks collection
     recorder.ondataavailable = e => {
         if (e.data && e.data.size > 0) {
-            recordedChunks.push(e.data);
+            streamChunks.push(e.data);
         }
     };
 
@@ -74,7 +80,7 @@ start.addEventListener('click', async function() {
     recorder.onstop = function(e) {
         console.log("data available after MediaRecorder.stop() called.");
 
-        blobData = new Blob(recordedChunks, { type: 'video/webm' });
+        blobData = new Blob(streamChunks, { type: 'video/webm' });
         postToServer(postToServerUrl, blobData)
         console.log("recorder stopped");
     }
@@ -130,7 +136,7 @@ let isPlaying = false;
 play.addEventListener('click', () => {
     playback.hidden = !playback.hidden;
     if (!isPlaying && !playback.hidden) {
-        playback.src = window.URL.createObjectURL(new Blob(recordedChunks, { type: 'video/webm' }));
+        playback.src = window.URL.createObjectURL(new Blob(streamChunks, { type: 'video/webm' }));
         playback.play();
         play.innerText = "Hide";
     } else {
@@ -146,7 +152,7 @@ playback.addEventListener('ended', () => { isPlaying = false });
 
 // Save the recording
 save.addEventListener('click', () => {
-    blobData = new Blob(recordedChunks, { type: 'video/webm' });
+    blobData = new Blob(streamChunks, { type: 'video/webm' });
     const url = window.URL.createObjectURL(blobData);
     const a = document.createElement('a');
     a.style.display = 'none';
