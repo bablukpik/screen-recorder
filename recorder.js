@@ -167,7 +167,7 @@ save.addEventListener('click', () => {
     }, 100);
 });
 
-// Upload to server
+// Post to server
 const postToServer = function(url, recordedBlob) {
     console.log(recordedBlob);
 
