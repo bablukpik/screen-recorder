@@ -76,10 +76,6 @@ nvm/
 false/
 
 # Symlink
-features/step_definitions/fn-cucumber-js
-data/dummy-database.sql
-
-resources/tdg/*.json
 reports/*.xml
 reports/*.json
 /.run/*.*
