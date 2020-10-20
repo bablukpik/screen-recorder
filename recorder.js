@@ -7,6 +7,7 @@ const save = document.getElementById('recordSave');
 
 let userMediaStream, displayMediaStream, stream, recorder, streamChunks = [],
     blobData;
+const serverUrl = `./upload-video.php`;
 const userMediaConstraints = { video: false, audio: true };
 const displayMediaConstraints = {
     video: {
@@ -15,7 +16,12 @@ const displayMediaConstraints = {
     },
     audio: false
 };
-const postToServerUrl = `./upload-video.php`;
+
+// Filename based on timestamp
+const getFilename = () => {
+    const timestamp = Math.floor(Date.now() / 1000);
+    return `recording-${timestamp}.webm`;
+}
 
 // Mixes multiple tracks
 function mixer(stream1, stream2) {
@@ -32,13 +38,6 @@ function mixer(stream1, stream2) {
     tracks = tracks.concat(stream1.getVideoTracks()).concat(stream2.getVideoTracks());
 
     return new MediaStream(tracks)
-}
-
-// Returns a filename based on timestamp
-function getFilename() {
-    const now = new Date();
-    const timestamp = now.toISOString();
-    return `my-recording-${timestamp}`;
 }
 
 // Start recording
@@ -81,7 +80,7 @@ start.addEventListener('click', async function() {
         console.log("data available after MediaRecorder.stop() called.");
 
         blobData = new Blob(streamChunks, { type: 'video/webm' });
-        postToServer(postToServerUrl, blobData)
+        postToServer(serverUrl, blobData, getFilename())
         console.log("recorder stopped");
     }
 
@@ -168,12 +167,11 @@ save.addEventListener('click', () => {
 });
 
 // Post to server
-const postToServer = function(url, recordedBlob) {
+const postToServer = (url, recordedBlob, fileName) => {
     console.log(recordedBlob);
 
     let formData = new FormData();
-    formData.append('video', recordedBlob);
-
+    formData.append('video', recordedBlob, fileName);
     var request = new XMLHttpRequest();
     request.onreadystatechange = function() {
         if (request.readyState == 4 && request.status == 200) {
@@ -181,6 +179,5 @@ const postToServer = function(url, recordedBlob) {
         }
     };
     request.open('POST', url, true);
-    // request.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
     request.send(formData);
 }
